@@ -4,8 +4,11 @@ import { HeroSection } from "./components/HeroSection";
 import { SuggestedQuestions } from "./components/SuggestedQuestions";
 import { BottomInput } from "./components/BottomInput";
 import { ChatDemo, ScenarioType } from "./components/ChatDemo";
+import { PhoneMockup } from "./components/PhoneMockup";
+import { useIsMobile } from "./hooks/useIsMobile";
 
 export default function App() {
+  const isMobile = useIsMobile();
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [initialQuestion, setInitialQuestion] = useState<string>("");
@@ -60,8 +63,8 @@ export default function App() {
     );
   }
 
-  return (
-    <div className="bg-white relative w-[375px] min-h-[812px] mx-auto overflow-hidden">
+  const homeContent = (
+    <div className="bg-white relative w-[375px] min-h-[812px] overflow-hidden" style={{ paddingTop: !isMobile ? 46 : 0 }}>
       <Header />
       <HeroSection onChipClick={handleChipClick} />
       <SuggestedQuestions onQuestionClick={handleQuestionClick} />
@@ -70,6 +73,14 @@ export default function App() {
         onToggleExpanded={() => setIsInputExpanded(!isInputExpanded)}
         onSend={handleInputSend}
       />
+    </div>
+  );
+
+  if (isMobile) return homeContent;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#f2f2f7" }}>
+      <PhoneMockup>{homeContent}</PhoneMockup>
     </div>
   );
 }

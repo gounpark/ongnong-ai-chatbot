@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { PhoneMockup } from "./PhoneMockup";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { ChatHeader } from "./chat/ChatHeader";
 import { BottomInput } from "./BottomInput";
 import { UserMessageBubble } from "./chat/UserMessageBubble";
@@ -315,7 +317,7 @@ const FLOW_BUTTONS = [
 
 function ScenarioButtons({ active, onClick }: { active: ScenarioType | null; onClick: (id: ScenarioType) => void }) {
   return (
-    <div className="flex flex-col gap-[10px] pt-[80px] pl-[12px]">
+    <div className="flex flex-col gap-[10px]">
       {FLOW_BUTTONS.map(s => (
         <button key={s.id} onClick={() => onClick(s.id)} className="flex flex-col items-center gap-[3px]">
           <div className={`w-[44px] h-[44px] rounded-full flex items-center justify-center shadow-md border transition-all duration-200 ${
@@ -352,12 +354,12 @@ function FadeIn({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
-function EmptyState() {
+function EmptyState({ isMobile }: { isMobile: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-[16px] px-[20px] text-center">
       <div className="text-[48px]">🌱</div>
       <p style={{ ...P, fontWeight: 600, fontSize: 16, color: "#333", lineHeight: 1.5 }}>
-        화면 옆 버튼을 눌러<br />시나리오를 선택해보세요
+        {isMobile ? "아래 버튼을 눌러" : "화면 옆 버튼을 눌러"}<br />시나리오를 선택해보세요
       </p>
       <p style={{ ...P, fontWeight: 400, fontSize: 13, color: "#aaa", lineHeight: 1.5 }}>
         사과·딸기 진단, 보조금, 통번역,<br />영농일지 등을 체험해볼 수 있습니다.
@@ -366,8 +368,54 @@ function EmptyState() {
   );
 }
 
+// ─── Mobile scenario popup ────────────────────────────────────────────────────
+function ScenarioPopup({ active, onSelect, onClose }: {
+  active: ScenarioType | null;
+  onSelect: (id: ScenarioType) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end"
+      style={{ background: "rgba(0,0,0,0.4)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full rounded-t-[24px] bg-white pb-[env(safe-area-inset-bottom,16px)]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-center pt-[12px] pb-[4px]">
+          <div className="w-[36px] h-[4px] rounded-full bg-[#e0e0e0]" />
+        </div>
+        <p style={{ ...P, fontWeight: 600, fontSize: 15, color: "#222" }} className="px-[20px] py-[14px]">
+          시나리오 선택
+        </p>
+        <div className="grid grid-cols-3 gap-[10px] px-[16px] pb-[20px]">
+          {FLOW_BUTTONS.map(s => (
+            <button
+              key={s.id}
+              onClick={() => { onSelect(s.id); onClose(); }}
+              className="flex flex-col items-center gap-[6px] py-[14px] rounded-[14px] border transition-all"
+              style={{
+                borderColor: active === s.id ? "#3170e2" : "#e8e8e8",
+                background: active === s.id ? "#ebf1ff" : "white",
+              }}
+            >
+              <span className="text-[28px] leading-none">{s.emoji}</span>
+              <span style={{ ...P, fontWeight: 500, fontSize: 12, color: active === s.id ? "#3170e2" : "#555" }}>
+                {s.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ChatDemo ────────────────────────────────────────────────────────────
 export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDemoProps) {
+  const isMobile = useIsMobile();
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFlow, setActiveFlow] = useState<ScenarioType | null>(null);
@@ -375,6 +423,7 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
   const [isExpanded, setIsExpanded] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [showScenarioPopup, setShowScenarioPopup] = useState(false);
   const [srcType, setSrcType] = useState<"disease" | "subsidy">("disease");
   const [farmingAdjusted, setFarmingAdjusted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -544,64 +593,109 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
     setInputValue("");
   }
 
-  return (
-    <div className="flex items-start" style={{ margin: "0 auto", width: "fit-content" }}>
-      {/* ── Phone ────────────────────────────────────────── */}
-      <div className="bg-white relative w-[375px] min-h-[812px] overflow-hidden flex flex-col">
-        <ChatHeader onBack={onBack} />
+  const phoneContent = (
+    <div
+      className="bg-white relative overflow-hidden flex flex-col"
+      style={{
+        width: 375,
+        height: isMobile ? "100dvh" : 812,
+        paddingTop: !isMobile ? 46 : 0,
+      }}
+    >
+      <ChatHeader onBack={onBack} />
 
-        {/* Chat area */}
-        <div ref={scrollRef} className="absolute left-0 right-0 overflow-y-auto px-[16px] py-[16px]"
-          style={{ top: 70, bottom: 110 }}>
+      {/* Chat area */}
+      <div
+        ref={scrollRef}
+        className="absolute left-0 right-0 overflow-y-auto px-[16px] py-[16px]"
+        style={{ top: 70, bottom: 110 }}
+      >
+        {messages.length === 0 && !isLoading && <EmptyState isMobile={isMobile} />}
 
-          {messages.length === 0 && !isLoading && <EmptyState />}
+        {messages.map((msg) => (
+          <FadeIn key={msg.id} delay={0}>
+            <div className={`mb-[20px] flex ${msg.kind === "ai" ? "justify-start" : "justify-end"}`}>
+              {msg.kind === "user-text" && (
+                <UserMessageBubble message={msg.text!} timestamp={msg.ts} />
+              )}
+              {msg.kind === "user-image" && (
+                <ImageMessageBubble imageType={msg.imageType!} text={msg.text} timestamp={msg.ts} />
+              )}
+              {msg.kind === "ai" && (
+                <ChatContainer timestamp={msg.ts}>
+                  <AIResponseHeader />
+                  {msg.content}
+                </ChatContainer>
+              )}
+            </div>
+          </FadeIn>
+        ))}
 
-          {messages.map((msg, i) => (
-            <FadeIn key={msg.id} delay={0}>
-              <div className={`mb-[20px] flex ${msg.kind === "ai" ? "justify-start" : "justify-end"}`}>
-                {msg.kind === "user-text" && (
-                  <UserMessageBubble message={msg.text!} timestamp={msg.ts} />
-                )}
-                {msg.kind === "user-image" && (
-                  <ImageMessageBubble
-                    imageType={msg.imageType!}
-                    text={msg.text}
-                    timestamp={msg.ts}
-                  />
-                )}
-                {msg.kind === "ai" && (
-                  <ChatContainer timestamp={msg.ts}>
-                    <AIResponseHeader />
-                    {msg.content}
-                  </ChatContainer>
-                )}
-              </div>
-            </FadeIn>
-          ))}
-
-          {isLoading && (
-            <FadeIn delay={0}>
-              <div className="flex justify-start mb-[20px]">
-                <LoadingIndicator />
-              </div>
-            </FadeIn>
-          )}
-        </div>
-
-        <BottomInput
-          isExpanded={isExpanded}
-          onToggleExpanded={() => setIsExpanded(!isExpanded)}
-          inputValue={inputValue}
-          onInputChange={setInputValue}
-          onSend={handleSend}
-          onMicClick={() => setShowVoice(true)}
-        />
-
-        {showVoice && <VoiceOverlay onClose={() => setShowVoice(false)} />}
-        {showSources && <SourceSheet onClose={() => setShowSources(false)} type={srcType} />}
+        {isLoading && (
+          <FadeIn delay={0}>
+            <div className="flex justify-start mb-[20px]">
+              <LoadingIndicator />
+            </div>
+          </FadeIn>
+        )}
       </div>
 
-      {/* ── Demo buttons outside phone ────────────────────── */}
+      <BottomInput
+        isExpanded={isExpanded}
+        onToggleExpanded={() => setIsExpanded(!isExpanded)}
+        inputValue={inputValue}
+        onInputChange={setInputValue}
+        onSend={handleSend}
+        onMicClick={() => setShowVoice(true)}
+      />
+
+      {/* Mobile FAB for scenario selection */}
+      {isMobile && (
+        <button
+          onClick={() => setShowScenarioPopup(true)}
+          className="absolute bottom-[120px] right-[16px] w-[48px] h-[48px] rounded-full shadow-lg flex items-center justify-center z-20"
+          style={{ background: "#3170e2" }}
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="2" y="2" width="8" height="8" rx="2" fill="white" />
+            <rect x="12" y="2" width="8" height="8" rx="2" fill="white" opacity="0.7" />
+            <rect x="2" y="12" width="8" height="8" rx="2" fill="white" opacity="0.7" />
+            <rect x="12" y="12" width="8" height="8" rx="2" fill="white" opacity="0.5" />
+          </svg>
+        </button>
+      )}
+
+      {showVoice && <VoiceOverlay onClose={() => setShowVoice(false)} />}
+      {showSources && <SourceSheet onClose={() => setShowSources(false)} type={srcType} />}
+      {isMobile && showScenarioPopup && (
+        <ScenarioPopup
+          active={activeFlow}
+          onSelect={triggerFlow}
+          onClose={() => setShowScenarioPopup(false)}
+        />
+      )}
+    </div>
+  );
+
+  // Mobile: full screen
+  if (isMobile) {
+    return <div className="w-full">{phoneContent}</div>;
+  }
+
+  // Desktop: centered mockup with side buttons and hint
+  return (
+    <div className="min-h-screen flex items-center justify-center gap-[32px]" style={{ background: "#f2f2f7" }}>
+      {/* Left hint */}
+      <div className="flex flex-col items-center gap-[12px] w-[120px]">
+        <div className="text-[28px]">👉</div>
+        <p style={{ ...P, fontWeight: 500, fontSize: 13, color: "#888", lineHeight: 1.6, textAlign: "center" }}>
+          화면 옆 버튼을 눌러<br />시나리오를<br />선택해 보세요
+        </p>
+      </div>
+
+      <PhoneMockup>{phoneContent}</PhoneMockup>
+
+      {/* Right scenario buttons */}
       <ScenarioButtons active={activeFlow} onClick={triggerFlow} />
     </div>
   );
