@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "./components/Header";
 import { HeroSection } from "./components/HeroSection";
 import { SuggestedQuestions } from "./components/SuggestedQuestions";
@@ -6,6 +6,7 @@ import { BottomInput } from "./components/BottomInput";
 import { ChatDemo, ScenarioType } from "./components/ChatDemo";
 import { PhoneMockup } from "./components/PhoneMockup";
 import { useIsMobile } from "./hooks/useIsMobile";
+import { VoiceOverlay } from "./components/chat/VoiceOverlay";
 
 const P: React.CSSProperties = { fontFamily: "'Pretendard', sans-serif" };
 
@@ -67,10 +68,53 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [homeHighlightedPanel, setHomeHighlightedPanel] = useState<"camera" | "image" | "file" | null>(null);
   const [homePendingImageType, setHomePendingImageType] = useState<"apple" | "strawberry-fruit" | "strawberry-leaf" | null>(null);
+  const [showHomeVoice, setShowHomeVoice] = useState(false);
+  const [homeVoiceText, setHomeVoiceText] = useState("");
+  const homeTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function clearHomeTimers() {
+    homeTimers.current.forEach(clearTimeout);
+    homeTimers.current = [];
+  }
 
   function handleScenarioSelect(id: ScenarioType) {
     // 채팅 중이면 홈으로 돌아감
     if (showChat) setShowChat(false);
+    clearHomeTimers();
+    setShowHomeVoice(false);
+    setHomeVoiceText("");
+
+    if (id === "farming") {
+      // 타이핑 없이 바로 홈에서 음성 오버레이
+      setIsTyping(false);
+      setTypingText("");
+      setShowHomeVoice(true);
+
+      const FARMING_TEXT = SCENARIO_HOME_TEXT["farming"];
+      const charDelay = Math.min(FARMING_TEXT.length * 35, 900) / FARMING_TEXT.length;
+      let vi = 0;
+
+      const t1 = setTimeout(() => {
+        const interval = setInterval(() => {
+          vi++;
+          setHomeVoiceText(FARMING_TEXT.slice(0, vi));
+          if (vi >= FARMING_TEXT.length) {
+            clearInterval(interval);
+            const t2 = setTimeout(() => {
+              setShowHomeVoice(false);
+              setHomeVoiceText("");
+              setActiveScenario(id);
+              setShowChat(true);
+            }, 800);
+            homeTimers.current.push(t2);
+          }
+        }, charDelay);
+        homeTimers.current.push(interval as unknown as ReturnType<typeof setTimeout>);
+      }, 700);
+      homeTimers.current.push(t1);
+      return;
+    }
+
     setIsTyping(true);
     setTypingText("");
 
@@ -105,6 +149,9 @@ export default function App() {
       }
     }, charDelay);
   }
+
+  // clean up on unmount
+  useEffect(() => () => clearHomeTimers(), []);
 
   const handleBack = () => {
     setShowChat(false);
@@ -154,6 +201,12 @@ export default function App() {
         typingText={typingText}
         isTyping={isTyping}
       />
+      {showHomeVoice && (
+        <VoiceOverlay
+          onClose={() => { clearHomeTimers(); setShowHomeVoice(false); setHomeVoiceText(""); }}
+          transcriptionText={homeVoiceText || undefined}
+        />
+      )}
     </div>
   );
 

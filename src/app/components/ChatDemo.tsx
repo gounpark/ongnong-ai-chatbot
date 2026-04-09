@@ -39,7 +39,7 @@ function getTimestamp() {
 }
 
 // ─── Message types ────────────────────────────────────────────────────────────
-type MsgKind = "user-text" | "user-image" | "ai" | "ai-subsidy" | "ai-apple-diagnosis" | "ai-strawberry-stage2";
+type MsgKind = "user-text" | "user-image" | "ai" | "ai-subsidy" | "ai-apple-diagnosis" | "ai-strawberry-stage2" | "ai-farming-step1";
 interface ChatMsg {
   id: string;
   kind: MsgKind;
@@ -69,7 +69,9 @@ type Step =
   | { at: number; kind: "ai-apple-diagnosis" }
   | { at: number; kind: "ai-strawberry-stage2" }
   | { at: number; kind: "voice-open" }
-  | { at: number; kind: "voice-close" };
+  | { at: number; kind: "voice-close" }
+  | { at: number; kind: "ai-farming-step1" }
+  | { at: number; kind: "farming-choose"; value: "yes" | "no" };
 
 // ─── Scenario first messages ──────────────────────────────────────────────────
 const SCENARIO_FIRST_MESSAGES: Record<ScenarioType,
@@ -81,7 +83,7 @@ const SCENARIO_FIRST_MESSAGES: Record<ScenarioType,
   strawberry: { kind: "image", imageType: "strawberry-fruit", text: "최근에 비가 내린 후로 상태가 이상해졌어." },
   subsidy: { kind: "text", text: "받을 수 있는 보조금 확인하기" },
   translation: { kind: "text", text: "내일 오전 9시부터 씨감자 심기 베트남어로" },
-  farming: { kind: "none" }, // 음성으로 시작
+  farming: { kind: "text", text: "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어." }, // 홈 음성 → 채팅에 바로 표시
   faq: { kind: "text", text: "자주 묻는 질문 알려줘" },
 };
 
@@ -247,7 +249,14 @@ function TranslationStep2Content() {
   );
 }
 
-function FarmingStep1Content({ onAdjust }: { onAdjust: () => void }) {
+function FarmingStep1Content({
+  farmingChoice,
+  onChoose,
+}: {
+  farmingChoice: "yes" | "no" | null;
+  onChoose: (v: "yes" | "no") => void;
+}) {
+  const chosen = farmingChoice !== null;
   return (
     <div className="flex flex-col gap-[16px] w-full">
       <AITextResponse>
@@ -267,16 +276,39 @@ function FarmingStep1Content({ onAdjust }: { onAdjust: () => void }) {
       <div className="flex flex-col gap-[10px]">
         <AlertCard emoji="⚡️" title="주의" message="다음 주 화요일에는 비가 내릴 예정입니다. ☔ 후속 물주기 날짜를 수요일로 조정하시겠어요?" />
         <div className="flex gap-[8px]">
+          {/* 네 버튼 */}
           <button
-            onClick={onAdjust}
-            className="flex items-center justify-center gap-[6px] px-[14px] py-[9px] rounded-[8px] border border-[#3170e2] bg-[#ebf1ff] hover:bg-[#dce8ff] transition-colors"
+            onClick={() => onChoose("yes")}
+            disabled={chosen && farmingChoice !== "yes"}
+            className={`flex items-center justify-center px-[14px] py-[9px] rounded-[8px] border transition-all duration-200 ${
+              farmingChoice === "yes"
+                ? "border-[#3170e2] bg-[#3170e2]"
+                : chosen
+                ? "border-[#e0e0e0] bg-[#f5f5f5] opacity-40"
+                : "border-[#3170e2] bg-[#ebf1ff] hover:bg-[#dce8ff]"
+            }`}
           >
-            <span style={{ ...P, fontWeight: 600, fontSize: 13, color: "#3170e2" }}>네, 수요일로 조정할게요</span>
+            <span style={{
+              ...P, fontWeight: 600, fontSize: 13,
+              color: farmingChoice === "yes" ? "white" : chosen ? "#aaa" : "#3170e2",
+            }}>네, 수요일로 조정할게요</span>
           </button>
+          {/* 아니오 버튼 */}
           <button
-            className="flex items-center justify-center gap-[6px] px-[14px] py-[9px] rounded-[8px] border border-[#ddd] bg-white hover:bg-[#f5f5f5] transition-colors"
+            onClick={() => onChoose("no")}
+            disabled={chosen && farmingChoice !== "no"}
+            className={`flex items-center justify-center px-[14px] py-[9px] rounded-[8px] border transition-all duration-200 ${
+              farmingChoice === "no"
+                ? "border-[#888] bg-[#efefef]"
+                : chosen
+                ? "border-[#e0e0e0] bg-[#f5f5f5] opacity-40"
+                : "border-[#ddd] bg-white hover:bg-[#f5f5f5]"
+            }`}
           >
-            <span style={{ ...P, fontWeight: 500, fontSize: 13, color: "#666" }}>아니오</span>
+            <span style={{
+              ...P, fontWeight: 500, fontSize: 13,
+              color: farmingChoice === "no" ? "#444" : chosen ? "#aaa" : "#666",
+            }}>아니오</span>
           </button>
         </div>
       </div>
@@ -390,11 +422,11 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
   const [showVoice, setShowVoice] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [srcType, setSrcType] = useState<"disease" | "subsidy">("disease");
-  const [farmingAdjusted, setFarmingAdjusted] = useState(false);
   const [highlightedPanel, setHighlightedPanel] = useState<"camera" | "image" | "file" | null>(null);
   const [pendingImageType, setPendingImageType] = useState<"apple" | "strawberry-fruit" | "strawberry-leaf" | null>(null);
   const [subsidySelections, setSubsidySelections] = useState<(string | undefined)[]>([]);
   const [sourceBadgeHighlighted, setSourceBadgeHighlighted] = useState(false);
+  const [farmingChoice, setFarmingChoice] = useState<"yes" | "no" | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -414,6 +446,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     setPendingImageType(null);
     setSubsidySelections([]);
     setSourceBadgeHighlighted(false);
+    setFarmingChoice(null);
   }
 
   function addMsg(msg: Omit<ChatMsg, "id" | "ts">) {
@@ -482,6 +515,19 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
         if (step.kind === "ai-strawberry-stage2") { addMsg({ kind: "ai-strawberry-stage2" }); return; }
         if (step.kind === "voice-open") { setShowVoice(true); return; }
         if (step.kind === "voice-close") { setShowVoice(false); return; }
+        if (step.kind === "ai-farming-step1") { addMsg({ kind: "ai-farming-step1" }); return; }
+        if (step.kind === "farming-choose") {
+          setFarmingChoice(step.value);
+          addMsg({ kind: "user-text", text: step.value === "yes" ? "네, 수요일로 조정할게요" : "아니오" });
+          if (step.value === "yes") {
+            schedule(() => setIsLoading(true), L);
+            schedule(() => {
+              setIsLoading(false);
+              addMsg({ kind: "ai", content: <FarmingStep2Content /> });
+            }, L + R);
+          }
+          return;
+        }
         if (step.kind === "input-clear") { setInputValue(""); return; }
         if (step.kind === "input-type") {
           if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
@@ -506,7 +552,6 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
   function triggerFlow(id: ScenarioType) {
     clearAll();
     setIsLoading(false);
-    setFarmingAdjusted(false);
     setActiveFlow(id);
 
     if (id === "apple") {
@@ -649,22 +694,17 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     }
 
     else if (id === "farming") {
-      const TEXT1 = "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어.";
-
       let t = 0;
       const s: Step[] = [];
 
-      // 음성 버튼 탭 → 오버레이 → 텍스트 인식 → 전송
-      s.push({ at: t, kind: "voice-open" });
-      t += 900;
-      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
-      t += TD(TEXT1) + 600;
-      s.push({ at: t, kind: "voice-close" });
-      t += 300;
-      s.push({ at: t, kind: "user-text", text: TEXT1 });
-      t += L; s.push({ at: t, kind: "loading-on" });
+      // 첫 메시지는 홈 음성으로 이미 추가됨, 바로 loading
+      s.push({ at: t, kind: "loading-on" });
       t += R; s.push({ at: t, kind: "loading-off" });
-      s.push({ at: t, kind: "ai", content: <FarmingStep1Content onAdjust={handleFarmingAdjust} /> });
+      s.push({ at: t, kind: "ai-farming-step1" });
+
+      // 자동으로 "네" 선택
+      t += 2200;
+      s.push({ at: t, kind: "farming-choose", value: "yes" });
 
       runSteps(s);
     }
@@ -682,15 +722,17 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     }
   }
 
-  function handleFarmingAdjust() {
-    if (farmingAdjusted) return;
-    setFarmingAdjusted(true);
-    addMsg({ kind: "user-text", text: "네, 수요일로 조정할게요" });
-    schedule(() => setIsLoading(true), L);
-    schedule(() => {
-      setIsLoading(false);
-      addMsg({ kind: "ai", content: <FarmingStep2Content /> });
-    }, L + R);
+  function handleFarmingChoose(v: "yes" | "no") {
+    if (farmingChoice !== null) return; // 이미 선택됨
+    setFarmingChoice(v);
+    addMsg({ kind: "user-text", text: v === "yes" ? "네, 수요일로 조정할게요" : "아니오" });
+    if (v === "yes") {
+      schedule(() => setIsLoading(true), L);
+      schedule(() => {
+        setIsLoading(false);
+        addMsg({ kind: "ai", content: <FarmingStep2Content /> });
+      }, L + R);
+    }
   }
 
   function handleSend() {
@@ -742,7 +784,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
 
         {messages.map((msg) => (
           <FadeIn key={msg.id} delay={0}>
-            <div className={`mb-[20px] flex ${["ai", "ai-subsidy", "ai-apple-diagnosis", "ai-strawberry-stage2"].includes(msg.kind) ? "justify-start" : "justify-end"}`}>
+            <div className={`mb-[20px] flex ${["ai", "ai-subsidy", "ai-apple-diagnosis", "ai-strawberry-stage2", "ai-farming-step1"].includes(msg.kind) ? "justify-start" : "justify-end"}`}>
               {msg.kind === "user-text" && (
                 <UserMessageBubble message={msg.text!} timestamp={msg.ts} />
               )}
@@ -774,6 +816,12 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
                 <ChatContainer timestamp={msg.ts}>
                   <AIResponseHeader />
                   <StrawberryStage2Content onSrc={() => openSrc("disease")} sourceBadgeHighlighted={sourceBadgeHighlighted} />
+                </ChatContainer>
+              )}
+              {msg.kind === "ai-farming-step1" && (
+                <ChatContainer timestamp={msg.ts}>
+                  <AIResponseHeader />
+                  <FarmingStep1Content farmingChoice={farmingChoice} onChoose={handleFarmingChoose} />
                 </ChatContainer>
               )}
             </div>
