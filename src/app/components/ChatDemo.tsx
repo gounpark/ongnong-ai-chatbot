@@ -420,6 +420,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
   const [sourceBadgeHighlighted, setSourceBadgeHighlighted] = useState(false);
   const [farmingChoice, setFarmingChoice] = useState<"yes" | "no" | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastMsgRef = useRef<HTMLDivElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -450,10 +451,18 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     timers.current.push(t);
   }
 
-  // auto-scroll
+  // auto-scroll: 새 메시지 상단부터 보이도록 / 로딩은 하단으로
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const container = scrollRef.current;
+    if (!container) return;
+    if (isLoading) {
+      // 로딩 인디케이터는 항상 보이게 하단 스크롤
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+    if (lastMsgRef.current) {
+      // 새 메시지의 맨 위부터 읽을 수 있도록
+      lastMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [messages, isLoading]);
 
@@ -782,9 +791,12 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
       >
         {messages.length === 0 && !isLoading && <EmptyState />}
 
-        {messages.map((msg) => (
+        {messages.map((msg, i) => (
           <FadeIn key={msg.id} delay={0}>
-            <div className={`mb-[20px] flex ${["ai", "ai-subsidy", "ai-apple-diagnosis", "ai-strawberry-stage2", "ai-farming-step1"].includes(msg.kind) ? "justify-start" : "justify-end"}`}>
+            <div
+              ref={i === messages.length - 1 ? lastMsgRef : null}
+              className={`mb-[20px] flex ${["ai", "ai-subsidy", "ai-apple-diagnosis", "ai-strawberry-stage2", "ai-farming-step1"].includes(msg.kind) ? "justify-start" : "justify-end"}`}
+            >
               {msg.kind === "user-text" && (
                 <UserMessageBubble message={msg.text!} timestamp={msg.ts} />
               )}
