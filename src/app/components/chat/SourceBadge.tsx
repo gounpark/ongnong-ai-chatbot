@@ -7,9 +7,10 @@ const P: React.CSSProperties = { fontFamily: "'Pretendard', sans-serif" };
 interface SourceBadgeProps {
   onOpen?: () => void;
   type?: "disease" | "subsidy";
+  highlighted?: boolean;
 }
 
-export function SourceBadge({ onOpen, type = "disease" }: SourceBadgeProps) {
+export function SourceBadge({ onOpen, type = "disease", highlighted = false }: SourceBadgeProps) {
   const favicons = type === "subsidy"
     ? [rdaFavicon, nongsaroFavicon]
     : [rdaFavicon, ncpmsFavicon, nongsaroFavicon];
@@ -17,7 +18,11 @@ export function SourceBadge({ onOpen, type = "disease" }: SourceBadgeProps) {
   return (
     <button
       onClick={onOpen}
-      className="flex items-center gap-[6px] px-[10px] py-[6px] rounded-full border border-[#e8e8e8] bg-white w-fit hover:bg-[#f5f5f5] transition-colors"
+      className={`flex items-center gap-[6px] px-[10px] py-[6px] rounded-full border w-fit transition-all duration-200 ${
+        highlighted
+          ? "bg-[#dce8ff] border-[#3170e2] scale-95 shadow-sm"
+          : "bg-white border-[#e8e8e8] hover:bg-[#f5f5f5]"
+      }`}
     >
       <div className="flex items-center">
         {favicons.map((src, i) => (

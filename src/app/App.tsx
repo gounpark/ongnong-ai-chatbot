@@ -15,7 +15,6 @@ const FLOW_BUTTONS = [
   { id: "subsidy" as ScenarioType, emoji: "💰", label: "보조금" },
   { id: "translation" as ScenarioType, emoji: "🌐", label: "통번역" },
   { id: "farming" as ScenarioType, emoji: "📋", label: "영농일지" },
-  { id: "faq" as ScenarioType, emoji: "❓", label: "자주질문" },
 ];
 
 const SCENARIO_HOME_TEXT: Record<ScenarioType, string> = {
@@ -66,6 +65,8 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState<ScenarioType | null>(null);
   const [typingText, setTypingText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [homeHighlightedPanel, setHomeHighlightedPanel] = useState<"camera" | "image" | "file" | null>(null);
+  const [homePendingImageType, setHomePendingImageType] = useState<"apple" | "strawberry-fruit" | "strawberry-leaf" | null>(null);
 
   function handleScenarioSelect(id: ScenarioType) {
     // 채팅 중이면 홈으로 돌아감
@@ -85,8 +86,21 @@ export default function App() {
         setTimeout(() => {
           setTypingText("");
           setIsTyping(false);
-          setActiveScenario(id);
-          setShowChat(true);
+          if (id === "strawberry") {
+            // 메인에서 이미지 선택 패널 애니메이션
+            setIsInputExpanded(true);
+            setTimeout(() => setHomeHighlightedPanel("image"), 500);
+            setTimeout(() => { setIsInputExpanded(false); setHomeHighlightedPanel(null); }, 1100);
+            setTimeout(() => setHomePendingImageType("strawberry-fruit"), 1300);
+            setTimeout(() => {
+              setHomePendingImageType(null);
+              setActiveScenario(id);
+              setShowChat(true);
+            }, 2100);
+          } else {
+            setActiveScenario(id);
+            setShowChat(true);
+          }
         }, 500);
       }
     }, charDelay);
@@ -126,6 +140,8 @@ export default function App() {
       <HomeBottomInput
         isExpanded={isInputExpanded}
         onToggleExpanded={() => setIsInputExpanded(!isInputExpanded)}
+        highlightedOption={homeHighlightedPanel}
+        pendingImageType={homePendingImageType}
         onSend={(value) => {
           const lower = value.toLowerCase();
           let id: ScenarioType = "apple";
@@ -199,12 +215,16 @@ function HomeBottomInput({
   onSend,
   typingText,
   isTyping,
+  highlightedOption,
+  pendingImageType,
 }: {
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onSend: (value: string) => void;
   typingText?: string;
   isTyping?: boolean;
+  highlightedOption?: "camera" | "image" | "file" | null;
+  pendingImageType?: "apple" | "strawberry-fruit" | "strawberry-leaf" | null;
 }) {
   const [value, setValue] = useState("");
 
@@ -216,6 +236,8 @@ function HomeBottomInput({
       onToggleExpanded={onToggleExpanded}
       inputValue={displayValue}
       onInputChange={isTyping ? undefined : setValue}
+      highlightedOption={highlightedOption}
+      pendingImageType={pendingImageType}
       onSend={() => {
         if (!isTyping && value.trim()) {
           onSend(value.trim());

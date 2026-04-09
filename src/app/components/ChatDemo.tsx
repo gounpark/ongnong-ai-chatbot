@@ -39,7 +39,7 @@ function getTimestamp() {
 }
 
 // ─── Message types ────────────────────────────────────────────────────────────
-type MsgKind = "user-text" | "user-image" | "ai" | "ai-subsidy";
+type MsgKind = "user-text" | "user-image" | "ai" | "ai-subsidy" | "ai-apple-diagnosis" | "ai-strawberry-stage2";
 interface ChatMsg {
   id: string;
   kind: MsgKind;
@@ -65,20 +65,28 @@ type Step =
   | { at: number; kind: "panel-close" }
   | { at: number; kind: "panel-highlight"; option: "camera" | "image" | "file" }
   | { at: number; kind: "panel-image-preview"; imageType: "apple" | "strawberry-fruit" | "strawberry-leaf" }
-  | { at: number; kind: "open-source-sheet"; srcType: "disease" | "subsidy" };
+  | { at: number; kind: "open-source-sheet"; srcType: "disease" | "subsidy" }
+  | { at: number; kind: "ai-apple-diagnosis" }
+  | { at: number; kind: "ai-strawberry-stage2" }
+  | { at: number; kind: "voice-open" }
+  | { at: number; kind: "voice-close" };
 
 // ─── Scenario first messages ──────────────────────────────────────────────────
-const SCENARIO_FIRST_MESSAGES: Record<ScenarioType, { kind: "text"; text: string } | { kind: "none" }> = {
+const SCENARIO_FIRST_MESSAGES: Record<ScenarioType,
+  | { kind: "text"; text: string }
+  | { kind: "image"; imageType: "apple" | "strawberry-fruit" | "strawberry-leaf"; text: string }
+  | { kind: "none" }
+> = {
   apple: { kind: "text", text: "사과 표면에 갈색 반점이 생기는데 무슨 병인가요?" },
-  strawberry: { kind: "none" }, // 딸기는 사진으로 시작
+  strawberry: { kind: "image", imageType: "strawberry-fruit", text: "최근에 비가 내린 후로 상태가 이상해졌어." },
   subsidy: { kind: "text", text: "받을 수 있는 보조금 확인하기" },
   translation: { kind: "text", text: "내일 오전 9시부터 씨감자 심기 베트남어로" },
-  farming: { kind: "text", text: "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어." },
+  farming: { kind: "none" }, // 음성으로 시작
   faq: { kind: "text", text: "자주 묻는 질문 알려줘" },
 };
 
 // ─── AI Content components ────────────────────────────────────────────────────
-function AppleDiagnosisContent({ onSrc }: { onSrc: () => void }) {
+function AppleDiagnosisContent({ onSrc, sourceBadgeHighlighted }: { onSrc: () => void; sourceBadgeHighlighted?: boolean }) {
   return (
     <div className="flex flex-col gap-[14px] w-full">
       <DiagnosisResultCard crop="사과" disease="사과 탄저병" confidence={92} showAnnotatedImage imageType="apple" />
@@ -92,7 +100,7 @@ function AppleDiagnosisContent({ onSrc }: { onSrc: () => void }) {
           { name: "아족시스트로빈 수화제", desc: "물 2,000배 내외, 7~10일 간격, 수확 7일 전" },
         ]},
       ]} />
-      <SourceBadge onOpen={onSrc} />
+      <SourceBadge onOpen={onSrc} highlighted={sourceBadgeHighlighted} />
     </div>
   );
 }
@@ -141,7 +149,7 @@ function StrawberryStage1Content({ onSrc }: { onSrc: () => void }) {
   );
 }
 
-function StrawberryStage2Content({ onSrc }: { onSrc: () => void }) {
+function StrawberryStage2Content({ onSrc, sourceBadgeHighlighted }: { onSrc: () => void; sourceBadgeHighlighted?: boolean }) {
   return (
     <div className="flex flex-col gap-[14px] w-full">
       <AITextResponse>
@@ -155,7 +163,7 @@ function StrawberryStage2Content({ onSrc }: { onSrc: () => void }) {
         externalLinkLabel="농사로 바로가기"
       />
       <AlertCard emoji="⚡" title="방제 권장" message="다음 살포는 4~5일 후에 진행하시는 것을 추천드리며, 해당 진단 결과를 재배 캘린더에 등록해 드릴까요?" />
-      <SourceBadge onOpen={onSrc} />
+      <SourceBadge onOpen={onSrc} highlighted={sourceBadgeHighlighted} />
     </div>
   );
 }
@@ -386,6 +394,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
   const [highlightedPanel, setHighlightedPanel] = useState<"camera" | "image" | "file" | null>(null);
   const [pendingImageType, setPendingImageType] = useState<"apple" | "strawberry-fruit" | "strawberry-leaf" | null>(null);
   const [subsidySelections, setSubsidySelections] = useState<(string | undefined)[]>([]);
+  const [sourceBadgeHighlighted, setSourceBadgeHighlighted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -404,6 +413,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     setHighlightedPanel(null);
     setPendingImageType(null);
     setSubsidySelections([]);
+    setSourceBadgeHighlighted(false);
   }
 
   function addMsg(msg: Omit<ChatMsg, "id" | "ts">) {
@@ -459,7 +469,19 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
         if (step.kind === "panel-close") { setIsExpanded(false); setHighlightedPanel(null); return; }
         if (step.kind === "panel-highlight") { setHighlightedPanel(step.option); return; }
         if (step.kind === "panel-image-preview") { setPendingImageType(step.imageType); return; }
-        if (step.kind === "open-source-sheet") { openSrc(step.srcType); return; }
+        if (step.kind === "open-source-sheet") {
+          setSourceBadgeHighlighted(true);
+          const t2 = setTimeout(() => {
+            setSourceBadgeHighlighted(false);
+            openSrc(step.srcType);
+          }, 700);
+          timers.current.push(t2);
+          return;
+        }
+        if (step.kind === "ai-apple-diagnosis") { addMsg({ kind: "ai-apple-diagnosis" }); return; }
+        if (step.kind === "ai-strawberry-stage2") { addMsg({ kind: "ai-strawberry-stage2" }); return; }
+        if (step.kind === "voice-open") { setShowVoice(true); return; }
+        if (step.kind === "voice-close") { setShowVoice(false); return; }
         if (step.kind === "input-clear") { setInputValue(""); return; }
         if (step.kind === "input-type") {
           if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
@@ -513,7 +535,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
       s.push({ at: t, kind: "user-image", imageType: "apple", text: TEXT2 });
       t += L; s.push({ at: t, kind: "loading-on" });
       t += R; s.push({ at: t, kind: "loading-off" });
-      s.push({ at: t, kind: "ai", content: <AppleDiagnosisContent onSrc={() => openSrc("disease")} /> });
+      s.push({ at: t, kind: "ai-apple-diagnosis" });
 
       // 답변 출처 버튼 탭 플로우
       t += 3000;
@@ -523,30 +545,18 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     }
 
     else if (id === "strawberry") {
-      const TEXT1 = "최근에 비가 내린 후로 상태가 이상해졌어.";
       const TEXT2 = "추가 사진이에요. 더 확인해줘.";
 
       let t = 0;
       const s: Step[] = [];
 
-      // 첫 번째 이미지: 패널 열기 → 하이라이트 → 닫기 → 이미지 프리뷰 → 타이핑 → 전송
-      s.push({ at: t, kind: "panel-open" });
-      t += 500;
-      s.push({ at: t, kind: "panel-highlight", option: "image" });
-      t += 600;
-      s.push({ at: t, kind: "panel-close" });
-      t += 300;
-      s.push({ at: t, kind: "panel-image-preview", imageType: "strawberry-fruit" });
-      t += 200;
-      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
-      t += TD(TEXT1) + SEND_P;
-      s.push({ at: t, kind: "user-image", imageType: "strawberry-fruit", text: TEXT1 });
-      t += L; s.push({ at: t, kind: "loading-on" });
+      // 첫 번째 이미지는 이미 마운트시 추가됨, 바로 loading
+      s.push({ at: t, kind: "loading-on" });
       t += R; s.push({ at: t, kind: "loading-off" });
       s.push({ at: t, kind: "ai", content: <StrawberryStage1Content onSrc={() => openSrc("disease")} /> });
       t += N;
 
-      // 두 번째 이미지: 패널 다시 열기
+      // 두 번째 이미지: 패널 열기 → 하이라이트 → 닫기 → 이미지 프리뷰 → 타이핑 → 전송
       s.push({ at: t, kind: "panel-open" });
       t += 400;
       s.push({ at: t, kind: "panel-highlight", option: "image" });
@@ -560,7 +570,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
       s.push({ at: t, kind: "user-image", imageType: "strawberry-leaf", text: TEXT2 });
       t += L; s.push({ at: t, kind: "loading-on" });
       t += R; s.push({ at: t, kind: "loading-off" });
-      s.push({ at: t, kind: "ai", content: <StrawberryStage2Content onSrc={() => openSrc("disease")} /> });
+      s.push({ at: t, kind: "ai-strawberry-stage2" });
 
       // 답변 출처 버튼 탭 플로우
       t += 3000;
@@ -639,11 +649,20 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     }
 
     else if (id === "farming") {
+      const TEXT1 = "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어.";
+
       let t = 0;
       const s: Step[] = [];
 
-      // 첫 메시지 이미 있음, 바로 loading
-      s.push({ at: t, kind: "loading-on" });
+      // 음성 버튼 탭 → 오버레이 → 텍스트 인식 → 전송
+      s.push({ at: t, kind: "voice-open" });
+      t += 900;
+      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
+      t += TD(TEXT1) + 600;
+      s.push({ at: t, kind: "voice-close" });
+      t += 300;
+      s.push({ at: t, kind: "user-text", text: TEXT1 });
+      t += L; s.push({ at: t, kind: "loading-on" });
       t += R; s.push({ at: t, kind: "loading-off" });
       s.push({ at: t, kind: "ai", content: <FarmingStep1Content onAdjust={handleFarmingAdjust} /> });
 
@@ -688,6 +707,8 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
     const firstMsg = SCENARIO_FIRST_MESSAGES[scenario];
     if (firstMsg.kind === "text") {
       setMessages([{ id: crypto.randomUUID(), kind: "user-text", text: firstMsg.text, ts: getTimestamp() }]);
+    } else if (firstMsg.kind === "image") {
+      setMessages([{ id: crypto.randomUUID(), kind: "user-image", imageType: firstMsg.imageType, text: firstMsg.text, ts: getTimestamp() }]);
     } else {
       setMessages([]);
     }
@@ -721,7 +742,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
 
         {messages.map((msg) => (
           <FadeIn key={msg.id} delay={0}>
-            <div className={`mb-[20px] flex ${msg.kind === "ai" || msg.kind === "ai-subsidy" ? "justify-start" : "justify-end"}`}>
+            <div className={`mb-[20px] flex ${["ai", "ai-subsidy", "ai-apple-diagnosis", "ai-strawberry-stage2"].includes(msg.kind) ? "justify-start" : "justify-end"}`}>
               {msg.kind === "user-text" && (
                 <UserMessageBubble message={msg.text!} timestamp={msg.ts} />
               )}
@@ -741,6 +762,18 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
                   {msg.subsidyStepIndex === 1 && <SubsidyStep2Content selected={subsidySelections[1]} />}
                   {msg.subsidyStepIndex === 2 && <SubsidyStep3Content selected={subsidySelections[2]} />}
                   {msg.subsidyStepIndex === 3 && <SubsidyStep4Content selected={subsidySelections[3]} />}
+                </ChatContainer>
+              )}
+              {msg.kind === "ai-apple-diagnosis" && (
+                <ChatContainer timestamp={msg.ts}>
+                  <AIResponseHeader />
+                  <AppleDiagnosisContent onSrc={() => openSrc("disease")} sourceBadgeHighlighted={sourceBadgeHighlighted} />
+                </ChatContainer>
+              )}
+              {msg.kind === "ai-strawberry-stage2" && (
+                <ChatContainer timestamp={msg.ts}>
+                  <AIResponseHeader />
+                  <StrawberryStage2Content onSrc={() => openSrc("disease")} sourceBadgeHighlighted={sourceBadgeHighlighted} />
                 </ChatContainer>
               )}
             </div>
@@ -767,7 +800,7 @@ export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
         pendingImageType={pendingImageType}
       />
 
-      {showVoice && <VoiceOverlay onClose={() => setShowVoice(false)} />}
+      {showVoice && <VoiceOverlay onClose={() => setShowVoice(false)} transcriptionText={inputValue || undefined} />}
       {showSources && <SourceSheet onClose={() => setShowSources(false)} type={srcType} />}
     </div>
   );
