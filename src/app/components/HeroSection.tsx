@@ -159,7 +159,7 @@ export function HeroSection({ onChipClick }: { onChipClick?: (label: string) => 
       </div>
 
       {/* Quick Action Chips */}
-      <div className="absolute content-stretch flex gap-[12px] items-center left-[19px] top-[132px] overflow-x-auto scrollbar-hide">
+      <div className="absolute flex gap-[12px] items-center left-0 right-0 top-[132px] px-[19px] overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         <div onClick={() => onChipClick?.("오늘농사 AI 가이드")}><QuickActionChip icon={<AIGuideIcon />} label="오늘농사 AI 가이드" /></div>
         <div onClick={() => onChipClick?.("농업 보조금 추천")}><QuickActionChip icon={<SubsidyIcon />} label="농업 보조금 추천" /></div>
         <div onClick={() => onChipClick?.("병해충 재해 진단")}><QuickActionChip icon={<DiagnosisIcon />} label="병해충 재해 진단" /></div>

@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { PhoneMockup } from "./PhoneMockup";
-import { useIsMobile } from "../hooks/useIsMobile";
 import { ChatHeader } from "./chat/ChatHeader";
 import { BottomInput } from "./BottomInput";
 import { UserMessageBubble } from "./chat/UserMessageBubble";
@@ -28,8 +26,7 @@ import { LoadingIndicator } from "./chat/LoadingIndicator";
 export type ScenarioType = "apple" | "strawberry" | "subsidy" | "translation" | "farming" | "faq";
 
 interface ChatDemoProps {
-  initialQuestion?: string;
-  scenario?: ScenarioType;
+  scenario?: ScenarioType | null;
   onBack?: () => void;
 }
 
@@ -51,6 +48,20 @@ interface ChatMsg {
   content?: React.ReactNode;
   ts: string;
 }
+
+// ─── Step types ───────────────────────────────────────────────────────────────
+type Step =
+  | { at: number; kind: "user-text"; text: string }
+  | { at: number; kind: "user-image"; imageType: "apple" | "strawberry-fruit" | "strawberry-leaf"; text: string }
+  | { at: number; kind: "loading-on" }
+  | { at: number; kind: "loading-off" }
+  | { at: number; kind: "ai"; content: React.ReactNode }
+  | { at: number; kind: "input-type"; text: string; duration: number }
+  | { at: number; kind: "input-clear" }
+  | { at: number; kind: "panel-open" }
+  | { at: number; kind: "panel-close" }
+  | { at: number; kind: "panel-highlight"; option: "camera" | "image" | "file" }
+  | { at: number; kind: "panel-image-preview"; imageType: "apple" | "strawberry-fruit" | "strawberry-leaf" };
 
 // ─── AI Content components ────────────────────────────────────────────────────
 function AppleDiagnosisContent({ onSrc }: { onSrc: () => void }) {
@@ -305,36 +316,6 @@ function FaqContent({ onVoice }: { onVoice: () => void }) {
   );
 }
 
-// ─── Demo buttons ─────────────────────────────────────────────────────────────
-const FLOW_BUTTONS = [
-  { id: "apple" as ScenarioType,       emoji: "🍎", label: "사과 진단" },
-  { id: "strawberry" as ScenarioType,  emoji: "🍓", label: "딸기 진단" },
-  { id: "subsidy" as ScenarioType,     emoji: "💰", label: "보조금" },
-  { id: "translation" as ScenarioType, emoji: "🌐", label: "통번역" },
-  { id: "farming" as ScenarioType,     emoji: "📋", label: "영농일지" },
-  { id: "faq" as ScenarioType,         emoji: "❓", label: "자주질문" },
-];
-
-function ScenarioButtons({ active, onClick }: { active: ScenarioType | null; onClick: (id: ScenarioType) => void }) {
-  return (
-    <div className="flex flex-col gap-[10px]">
-      {FLOW_BUTTONS.map(s => (
-        <button key={s.id} onClick={() => onClick(s.id)} className="flex flex-col items-center gap-[3px]">
-          <div className={`w-[44px] h-[44px] rounded-full flex items-center justify-center shadow-md border transition-all duration-200 ${
-            active === s.id ? "bg-[#3170e2] border-[#3170e2] scale-110" : "bg-white border-[#e0e0e0] hover:border-[#3170e2] hover:scale-105"
-          }`}>
-            <span className="text-[22px] leading-none">{s.emoji}</span>
-          </div>
-          <span style={{ ...P, fontWeight: 400, fontSize: 9, lineHeight: 1 }}
-            className={active === s.id ? "text-[#3170e2]" : "text-[#888]"}>
-            {s.label.slice(0, 4)}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ─── Fade-in wrapper ──────────────────────────────────────────────────────────
 function FadeIn({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const [visible, setVisible] = useState(false);
@@ -354,12 +335,12 @@ function FadeIn({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
-function EmptyState({ isMobile }: { isMobile: boolean }) {
+function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-[16px] px-[20px] text-center">
       <div className="text-[48px]">🌱</div>
       <p style={{ ...P, fontWeight: 600, fontSize: 16, color: "#333", lineHeight: 1.5 }}>
-        {isMobile ? "아래 버튼을 눌러" : "화면 옆 버튼을 눌러"}<br />시나리오를 선택해보세요
+        화면 옆 버튼을 눌러<br />시나리오를 선택해보세요
       </p>
       <p style={{ ...P, fontWeight: 400, fontSize: 13, color: "#aaa", lineHeight: 1.5 }}>
         사과·딸기 진단, 보조금, 통번역,<br />영농일지 등을 체험해볼 수 있습니다.
@@ -368,54 +349,20 @@ function EmptyState({ isMobile }: { isMobile: boolean }) {
   );
 }
 
-// ─── Mobile scenario popup ────────────────────────────────────────────────────
-function ScenarioPopup({ active, onSelect, onClose }: {
-  active: ScenarioType | null;
-  onSelect: (id: ScenarioType) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full rounded-t-[24px] bg-white pb-[env(safe-area-inset-bottom,16px)]"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex justify-center pt-[12px] pb-[4px]">
-          <div className="w-[36px] h-[4px] rounded-full bg-[#e0e0e0]" />
-        </div>
-        <p style={{ ...P, fontWeight: 600, fontSize: 15, color: "#222" }} className="px-[20px] py-[14px]">
-          시나리오 선택
-        </p>
-        <div className="grid grid-cols-3 gap-[10px] px-[16px] pb-[20px]">
-          {FLOW_BUTTONS.map(s => (
-            <button
-              key={s.id}
-              onClick={() => { onSelect(s.id); onClose(); }}
-              className="flex flex-col items-center gap-[6px] py-[14px] rounded-[14px] border transition-all"
-              style={{
-                borderColor: active === s.id ? "#3170e2" : "#e8e8e8",
-                background: active === s.id ? "#ebf1ff" : "white",
-              }}
-            >
-              <span className="text-[28px] leading-none">{s.emoji}</span>
-              <span style={{ ...P, fontWeight: 500, fontSize: 12, color: active === s.id ? "#3170e2" : "#555" }}>
-                {s.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+// ─── Timing helpers ───────────────────────────────────────────────────────────
+const CS = 35;    // char speed ms
+const MAX_T = 1000; // max typing ms
+const SEND_P = 200; // send pause ms
+const L = 350;    // loading delay
+const R = 1400;   // response delay
+const N = 600;    // gap between turns
+
+function TD(text: string): number {
+  return Math.min(text.length * CS, MAX_T);
 }
 
 // ─── Main ChatDemo ────────────────────────────────────────────────────────────
-export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDemoProps) {
-  const isMobile = useIsMobile();
+export function ChatDemo({ scenario, onBack }: ChatDemoProps) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFlow, setActiveFlow] = useState<ScenarioType | null>(null);
@@ -423,11 +370,13 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
   const [isExpanded, setIsExpanded] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [showSources, setShowSources] = useState(false);
-  const [showScenarioPopup, setShowScenarioPopup] = useState(false);
   const [srcType, setSrcType] = useState<"disease" | "subsidy">("disease");
   const [farmingAdjusted, setFarmingAdjusted] = useState(false);
+  const [highlightedPanel, setHighlightedPanel] = useState<"camera" | "image" | "file" | null>(null);
+  const [pendingImageType, setPendingImageType] = useState<"apple" | "strawberry-fruit" | "strawberry-leaf" | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const ts = getTimestamp();
 
@@ -435,6 +384,13 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
   function clearAll() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+    setInputValue("");
+    setHighlightedPanel(null);
+    setPendingImageType(null);
   }
 
   function addMsg(msg: Omit<ChatMsg, "id" | "ts">) {
@@ -456,30 +412,47 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
   function openSrc(type: "disease" | "subsidy") { setSrcType(type); setShowSources(true); }
 
   // ── Flow runner ─────────────────────────────────────────────────────────────
-  // Each step: { at (ms from flow start), action }
-  type Step =
-    | { at: number; kind: "user-text"; text: string }
-    | { at: number; kind: "user-image"; imageType: "apple" | "strawberry-fruit" | "strawberry-leaf"; text: string }
-    | { at: number; kind: "loading-on" }
-    | { at: number; kind: "loading-off" }
-    | { at: number; kind: "ai"; content: React.ReactNode };
-
   function runSteps(steps: Step[]) {
     steps.forEach(step => {
       schedule(() => {
-        if (step.kind === "loading-on")  { setIsLoading(true); return; }
+        if (step.kind === "loading-on") { setIsLoading(true); return; }
         if (step.kind === "loading-off") { setIsLoading(false); return; }
-        if (step.kind === "user-text")   { addMsg({ kind: "user-text", text: step.text }); return; }
-        if (step.kind === "user-image")  { addMsg({ kind: "user-image", imageType: step.imageType, text: step.text }); return; }
-        if (step.kind === "ai")          { addMsg({ kind: "ai", content: step.content }); return; }
+        if (step.kind === "user-text") {
+          setInputValue("");
+          addMsg({ kind: "user-text", text: step.text });
+          return;
+        }
+        if (step.kind === "user-image") {
+          setInputValue("");
+          setPendingImageType(null);
+          addMsg({ kind: "user-image", imageType: step.imageType, text: step.text });
+          return;
+        }
+        if (step.kind === "ai") { addMsg({ kind: "ai", content: step.content }); return; }
+        if (step.kind === "panel-open") { setIsExpanded(true); return; }
+        if (step.kind === "panel-close") { setIsExpanded(false); setHighlightedPanel(null); return; }
+        if (step.kind === "panel-highlight") { setHighlightedPanel(step.option); return; }
+        if (step.kind === "panel-image-preview") { setPendingImageType(step.imageType); return; }
+        if (step.kind === "input-clear") { setInputValue(""); return; }
+        if (step.kind === "input-type") {
+          if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+          setInputValue("");
+          const charDelay = step.duration / step.text.length;
+          let i = 0;
+          const interval = setInterval(() => {
+            i++;
+            setInputValue(step.text.slice(0, i));
+            if (i >= step.text.length) {
+              clearInterval(interval);
+              typingIntervalRef.current = null;
+            }
+          }, charDelay);
+          typingIntervalRef.current = interval;
+          return;
+        }
       }, step.at);
     });
   }
-
-  // Timing helpers
-  const L = 350;   // loading delay after user msg
-  const R = 1400;  // AI response delay from start of loading
-  const N = 700;   // gap between steps
 
   function triggerFlow(id: ScenarioType) {
     clearAll();
@@ -489,89 +462,151 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
     setActiveFlow(id);
 
     if (id === "apple") {
-      // Step 1: text question → 겹무늬썩음병
-      // Step 2: image upload → 탄저병 diagnosis
-      const s: Step[] = [
-        { at: 0,             kind: "user-text",  text: "사과 표면에 갈색 반점이 생기는데 무슨 병인가요?" },
-        { at: L,             kind: "loading-on" },
-        { at: L+R,           kind: "loading-off" },
-        { at: L+R,           kind: "ai", content: <AppleTextContent onSrc={() => openSrc("disease")} /> },
-        { at: L+R+N+200,     kind: "user-image", imageType: "apple", text: "증상이 다른거 같아. 사진을 보여줄게" },
-        { at: L+R+N+200+L,   kind: "loading-on" },
-        { at: L+R+N+200+L+R, kind: "loading-off" },
-        { at: L+R+N+200+L+R, kind: "ai", content: <AppleDiagnosisContent onSrc={() => openSrc("disease")} /> },
-      ];
+      const TEXT1 = "사과 표면에 갈색 반점이 생기는데 무슨 병인가요?";
+      const TEXT2 = "증상이 다른거 같아. 사진을 보여줄게";
+
+      let t = 0;
+      const s: Step[] = [];
+
+      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
+      t += TD(TEXT1) + SEND_P;
+      s.push({ at: t, kind: "user-text", text: TEXT1 });
+      t += L; s.push({ at: t, kind: "loading-on" });
+      t += R; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <AppleTextContent onSrc={() => openSrc("disease")} /> });
+      t += N;
+
+      s.push({ at: t, kind: "input-type", text: TEXT2, duration: TD(TEXT2) });
+      t += TD(TEXT2) + SEND_P;
+      s.push({ at: t, kind: "user-image", imageType: "apple", text: TEXT2 });
+      t += L; s.push({ at: t, kind: "loading-on" });
+      t += R; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <AppleDiagnosisContent onSrc={() => openSrc("disease")} /> });
+
       runSteps(s);
     }
 
     else if (id === "strawberry") {
-      const s1End = L + R;
-      const s2Start = s1End + N + 200;
-      const s: Step[] = [
-        { at: 0,        kind: "user-image", imageType: "strawberry-fruit", text: "최근에 비가 내린 후로 상태가 이상해졌어." },
-        { at: L,        kind: "loading-on" },
-        { at: L+R,      kind: "loading-off" },
-        { at: s1End,    kind: "ai", content: <StrawberryStage1Content onSrc={() => openSrc("disease")} /> },
-        { at: s2Start,  kind: "user-image", imageType: "strawberry-leaf", text: "추가 사진이에요. 더 확인해줘." },
-        { at: s2Start+L, kind: "loading-on" },
-        { at: s2Start+L+R, kind: "loading-off" },
-        { at: s2Start+L+R, kind: "ai", content: <StrawberryStage2Content onSrc={() => openSrc("disease")} /> },
-      ];
+      const TEXT1 = "최근에 비가 내린 후로 상태가 이상해졌어.";
+      const TEXT2 = "추가 사진이에요. 더 확인해줘.";
+
+      let t = 0;
+      const s: Step[] = [];
+
+      // 첫 번째 이미지: 패널 열기 → 하이라이트 → 닫기 → 이미지 프리뷰 → 타이핑 → 전송
+      s.push({ at: t, kind: "panel-open" });
+      t += 500;
+      s.push({ at: t, kind: "panel-highlight", option: "image" });
+      t += 600;
+      s.push({ at: t, kind: "panel-close" });
+      t += 300;
+      s.push({ at: t, kind: "panel-image-preview", imageType: "strawberry-fruit" });
+      t += 200;
+      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
+      t += TD(TEXT1) + SEND_P;
+      s.push({ at: t, kind: "user-image", imageType: "strawberry-fruit", text: TEXT1 });
+      t += L; s.push({ at: t, kind: "loading-on" });
+      t += R; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <StrawberryStage1Content onSrc={() => openSrc("disease")} /> });
+      t += N;
+
+      // 두 번째 이미지: 패널 다시 열기
+      s.push({ at: t, kind: "panel-open" });
+      t += 400;
+      s.push({ at: t, kind: "panel-highlight", option: "image" });
+      t += 500;
+      s.push({ at: t, kind: "panel-close" });
+      t += 200;
+      s.push({ at: t, kind: "panel-image-preview", imageType: "strawberry-leaf" });
+      t += 200;
+      s.push({ at: t, kind: "input-type", text: TEXT2, duration: TD(TEXT2) });
+      t += TD(TEXT2) + SEND_P;
+      s.push({ at: t, kind: "user-image", imageType: "strawberry-leaf", text: TEXT2 });
+      t += L; s.push({ at: t, kind: "loading-on" });
+      t += R; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <StrawberryStage2Content onSrc={() => openSrc("disease")} /> });
+
       runSteps(s);
     }
 
     else if (id === "subsidy") {
-      // 5-turn conversation, shorter loading per turn
       const SL = 300, SR = 900, SN = 600;
       let t = 0;
-      const addTurn = (steps: Step[], userText: string, aiNode: React.ReactNode) => {
-        steps.push({ at: t, kind: "user-text", text: userText });
-        t += SL; steps.push({ at: t, kind: "loading-on" });
-        t += SR; steps.push({ at: t, kind: "loading-off" });
-        steps.push({ at: t, kind: "ai", content: aiNode });
+      const s: Step[] = [];
+
+      const addTurn = (userText: string, aiNode: React.ReactNode) => {
+        const typeDur = TD(userText);
+        s.push({ at: t, kind: "input-type", text: userText, duration: typeDur });
+        t += typeDur + SEND_P;
+        s.push({ at: t, kind: "user-text", text: userText });
+        t += SL; s.push({ at: t, kind: "loading-on" });
+        t += SR; s.push({ at: t, kind: "loading-off" });
+        s.push({ at: t, kind: "ai", content: aiNode });
         t += SN;
       };
-      const s: Step[] = [];
-      addTurn(s, "받을 수 있는 보조금 확인하기", <SubsidyStep1Content />);
-      addTurn(s, '"충남"', <SubsidyStep2Content />);
-      addTurn(s, '"농업"', <SubsidyStep3Content />);
-      addTurn(s, '"청년농업인"', <SubsidyStep4Content />);
-      addTurn(s, '"신청 예정"', <SubsidyResultContent onSrc={() => openSrc("subsidy")} />);
+
+      addTurn("받을 수 있는 보조금 확인하기", <SubsidyStep1Content />);
+      addTurn('"충남"', <SubsidyStep2Content />);
+      addTurn('"농업"', <SubsidyStep3Content />);
+      addTurn('"청년농업인"', <SubsidyStep4Content />);
+      addTurn('"신청 예정"', <SubsidyResultContent onSrc={() => openSrc("subsidy")} />);
+
       runSteps(s);
     }
 
     else if (id === "translation") {
       const SL = 300, SR = 1100, SN = 800;
-      const s: Step[] = [
-        { at: 0,          kind: "user-text", text: "내일 오전 9시부터 비강자 심기 베트남어로" },
-        { at: SL,         kind: "loading-on" },
-        { at: SL+SR,      kind: "loading-off" },
-        { at: SL+SR,      kind: "ai", content: <TranslationStep1Content onSrc={() => openSrc("subsidy")} /> },
-        { at: SL+SR+SN,   kind: "user-text", text: "그 과정 메뉴얼로 설명해줘" },
-        { at: SL+SR+SN+SL, kind: "loading-on" },
-        { at: SL+SR+SN+SL+SR, kind: "loading-off" },
-        { at: SL+SR+SN+SL+SR, kind: "ai", content: <TranslationStep2Content onSrc={() => openSrc("subsidy")} /> },
-      ];
+      const TEXT1 = "내일 오전 9시부터 비강자 심기 베트남어로";
+      const TEXT2 = "그 과정 메뉴얼로 설명해줘";
+
+      let t = 0;
+      const s: Step[] = [];
+
+      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
+      t += TD(TEXT1) + SEND_P;
+      s.push({ at: t, kind: "user-text", text: TEXT1 });
+      t += SL; s.push({ at: t, kind: "loading-on" });
+      t += SR; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <TranslationStep1Content onSrc={() => openSrc("subsidy")} /> });
+      t += SN;
+
+      s.push({ at: t, kind: "input-type", text: TEXT2, duration: TD(TEXT2) });
+      t += TD(TEXT2) + SEND_P;
+      s.push({ at: t, kind: "user-text", text: TEXT2 });
+      t += SL; s.push({ at: t, kind: "loading-on" });
+      t += SR; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <TranslationStep2Content onSrc={() => openSrc("subsidy")} /> });
+
       runSteps(s);
     }
 
     else if (id === "farming") {
-      const s: Step[] = [
-        { at: 0,   kind: "user-text", text: "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어." },
-        { at: L,   kind: "loading-on" },
-        { at: L+R, kind: "loading-off" },
-        { at: L+R, kind: "ai", content: <FarmingStep1Content onAdjust={handleFarmingAdjust} /> },
-      ];
+      const TEXT1 = "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어.";
+      let t = 0;
+      const s: Step[] = [];
+
+      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
+      t += TD(TEXT1) + SEND_P;
+      s.push({ at: t, kind: "user-text", text: TEXT1 });
+      t += L; s.push({ at: t, kind: "loading-on" });
+      t += R; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <FarmingStep1Content onAdjust={handleFarmingAdjust} /> });
+
       runSteps(s);
     }
 
     else if (id === "faq") {
-      const s: Step[] = [
-        { at: 0,   kind: "user-text", text: '"자주 묻는 질문"' },
-        { at: L,   kind: "loading-on" },
-        { at: L+R, kind: "loading-off" },
-        { at: L+R, kind: "ai", content: <FaqContent onVoice={() => setShowVoice(true)} /> },
-      ];
+      const TEXT1 = "자주 묻는 질문 알려줘";
+      let t = 0;
+      const s: Step[] = [];
+
+      s.push({ at: t, kind: "input-type", text: TEXT1, duration: TD(TEXT1) });
+      t += TD(TEXT1) + SEND_P;
+      s.push({ at: t, kind: "user-text", text: TEXT1 });
+      t += L; s.push({ at: t, kind: "loading-on" });
+      t += R; s.push({ at: t, kind: "loading-off" });
+      s.push({ at: t, kind: "ai", content: <FaqContent onVoice={() => setShowVoice(true)} /> });
+
       runSteps(s);
     }
   }
@@ -593,14 +628,21 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
     setInputValue("");
   }
 
-  const phoneContent = (
+  // Mount 시 scenario prop으로 플로우 시작 (key prop 변경으로 리마운트 처리됨)
+  useEffect(() => {
+    if (scenario) {
+      triggerFlow(scenario);
+    }
+    return () => {
+      clearAll();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
     <div
       className="bg-white relative overflow-hidden flex flex-col"
-      style={{
-        width: 375,
-        height: isMobile ? "100dvh" : 812,
-        paddingTop: !isMobile ? 46 : 0,
-      }}
+      style={{ width: 375, height: 812, paddingTop: 46 }}
     >
       <ChatHeader onBack={onBack} />
 
@@ -610,7 +652,7 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
         className="absolute left-0 right-0 overflow-y-auto px-[16px] py-[16px]"
         style={{ top: 70, bottom: 110 }}
       >
-        {messages.length === 0 && !isLoading && <EmptyState isMobile={isMobile} />}
+        {messages.length === 0 && !isLoading && <EmptyState />}
 
         {messages.map((msg) => (
           <FadeIn key={msg.id} delay={0}>
@@ -647,56 +689,12 @@ export function ChatDemo({ initialQuestion: _iq, scenario: _is, onBack }: ChatDe
         onInputChange={setInputValue}
         onSend={handleSend}
         onMicClick={() => setShowVoice(true)}
+        highlightedOption={highlightedPanel}
+        pendingImageType={pendingImageType}
       />
-
-      {/* Mobile FAB for scenario selection */}
-      {isMobile && (
-        <button
-          onClick={() => setShowScenarioPopup(true)}
-          className="absolute bottom-[120px] right-[16px] w-[48px] h-[48px] rounded-full shadow-lg flex items-center justify-center z-20"
-          style={{ background: "#3170e2" }}
-        >
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <rect x="2" y="2" width="8" height="8" rx="2" fill="white" />
-            <rect x="12" y="2" width="8" height="8" rx="2" fill="white" opacity="0.7" />
-            <rect x="2" y="12" width="8" height="8" rx="2" fill="white" opacity="0.7" />
-            <rect x="12" y="12" width="8" height="8" rx="2" fill="white" opacity="0.5" />
-          </svg>
-        </button>
-      )}
 
       {showVoice && <VoiceOverlay onClose={() => setShowVoice(false)} />}
       {showSources && <SourceSheet onClose={() => setShowSources(false)} type={srcType} />}
-      {isMobile && showScenarioPopup && (
-        <ScenarioPopup
-          active={activeFlow}
-          onSelect={triggerFlow}
-          onClose={() => setShowScenarioPopup(false)}
-        />
-      )}
-    </div>
-  );
-
-  // Mobile: full screen
-  if (isMobile) {
-    return <div className="w-full">{phoneContent}</div>;
-  }
-
-  // Desktop: centered mockup with side buttons and hint
-  return (
-    <div className="min-h-screen flex items-center justify-center gap-[32px]" style={{ background: "#f2f2f7" }}>
-      {/* Left hint */}
-      <div className="flex flex-col items-center gap-[12px] w-[120px]">
-        <div className="text-[28px]">👉</div>
-        <p style={{ ...P, fontWeight: 500, fontSize: 13, color: "#888", lineHeight: 1.6, textAlign: "center" }}>
-          화면 옆 버튼을 눌러<br />시나리오를<br />선택해 보세요
-        </p>
-      </div>
-
-      <PhoneMockup>{phoneContent}</PhoneMockup>
-
-      {/* Right scenario buttons */}
-      <ScenarioButtons active={activeFlow} onClick={triggerFlow} />
     </div>
   );
 }

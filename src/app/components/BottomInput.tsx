@@ -1,4 +1,13 @@
 import svgPaths from "../../imports/svg-rv1bmyf9dl";
+import imgApple from "../../assets/apple-hand.png";
+import imgStrawberryFruit from "../../assets/strawberry-fruit.png";
+import imgStrawberryLeaf from "../../assets/strawberry-leaf.png";
+
+const IMAGE_SRCS: Record<string, string> = {
+  "apple": imgApple,
+  "strawberry-fruit": imgStrawberryFruit,
+  "strawberry-leaf": imgStrawberryLeaf,
+};
 
 function PlusIcon() {
   return (
@@ -61,39 +70,62 @@ function SendButton({ active, onClick }: { active: boolean; onClick: () => void 
 
 function CameraIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-      <path d="M40 14H34L30 8H18L14 14H8C5.79086 14 4 15.7909 4 18V36C4 38.2091 5.79086 40 8 40H40C42.2091 40 44 38.2091 44 36V18C44 15.7909 42.2091 14 40 14Z" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M24 32C27.3137 32 30 29.3137 30 26C30 22.6863 27.3137 20 24 20C20.6863 20 18 22.6863 18 26C18 29.3137 20.6863 32 24 32Z" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+      <path d="M40 14H34L30 8H18L14 14H8C5.79086 14 4 15.7909 4 18V36C4 38.2091 5.79086 40 8 40H40C42.2091 40 44 38.2091 44 36V18C44 15.7909 42.2091 14 40 14Z" stroke="#555555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M24 32C27.3137 32 30 29.3137 30 26C30 22.6863 27.3137 20 24 20C20.6863 20 18 22.6863 18 26C18 29.3137 20.6863 32 24 32Z" stroke="#555555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
 
 function ImageIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-      <rect x="6" y="8" width="36" height="32" rx="2" stroke="#666666" strokeWidth="2"/>
-      <path d="M6 32L16 22L22 28L30 20L42 32" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="15" cy="16" r="3" stroke="#666666" strokeWidth="2"/>
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+      <rect x="6" y="8" width="36" height="32" rx="2" stroke="#555555" strokeWidth="2"/>
+      <path d="M6 32L16 22L22 28L30 20L42 32" stroke="#555555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="15" cy="16" r="3" stroke="#555555" strokeWidth="2"/>
     </svg>
   );
 }
 
 function FileIcon() {
   return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-      <path d="M28 6H12C9.79086 6 8 7.79086 8 10V38C8 40.2091 9.79086 42 12 42H36C38.2091 42 40 40.2091 40 38V18L28 6Z" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M28 6V18H40" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+      <path d="M28 6H12C9.79086 6 8 7.79086 8 10V38C8 40.2091 9.79086 42 12 42H36C38.2091 42 40 40.2091 40 38V18L28 6Z" stroke="#555555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M28 6V18H40" stroke="#555555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
 
-function UploadOption({ icon, label }: { icon: JSX.Element; label: string }) {
+function UploadOption({
+  icon,
+  label,
+  highlighted,
+}: {
+  icon: JSX.Element;
+  label: string;
+  highlighted?: boolean;
+}) {
   return (
     <div className="flex flex-col items-center gap-[8px] cursor-pointer hover:opacity-70 transition-opacity">
-      <div className="flex items-center justify-center w-[64px] h-[64px] bg-white rounded-[12px] border border-[#ddd]">
-        {icon}
+      <div
+        className="flex items-center justify-center w-[64px] h-[64px] rounded-[16px] transition-colors"
+        style={{
+          background: highlighted ? "#3170e2" : "white",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+        }}
+      >
+        {highlighted ? (
+          <div style={{ filter: "brightness(0) invert(1)" }}>{icon}</div>
+        ) : (
+          icon
+        )}
       </div>
-      <p className="font-['Pretendard:Regular',sans-serif] text-[12px] text-[#666] text-center">{label}</p>
+      <p
+        style={{ fontFamily: "'Pretendard', sans-serif" }}
+        className={`text-[12px] text-center font-medium ${highlighted ? "text-[#3170e2]" : "text-[#555]"}`}
+      >
+        {label}
+      </p>
     </div>
   );
 }
@@ -105,9 +137,20 @@ interface BottomInputProps {
   onInputChange?: (value: string) => void;
   onSend?: () => void;
   onMicClick?: () => void;
+  highlightedOption?: "camera" | "image" | "file" | null;
+  pendingImageType?: "apple" | "strawberry-fruit" | "strawberry-leaf" | null;
 }
 
-export function BottomInput({ isExpanded, onToggleExpanded, inputValue = "", onInputChange, onSend, onMicClick }: BottomInputProps) {
+export function BottomInput({
+  isExpanded,
+  onToggleExpanded,
+  inputValue = "",
+  onInputChange,
+  onSend,
+  onMicClick,
+  highlightedOption,
+  pendingImageType,
+}: BottomInputProps) {
   const hasText = inputValue.trim().length > 0;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,14 +172,29 @@ export function BottomInput({ isExpanded, onToggleExpanded, inputValue = "", onI
   };
 
   return (
-    <div className="absolute bg-white content-stretch flex flex-col gap-[10px] items-center left-0 pb-[32px] pt-[20px] px-[16px] shadow-[0px_-2px_10px_0px_rgba(221,221,221,0.2)] top-[690px] w-[375px]">
+    <div className="absolute bg-white content-stretch flex flex-col gap-[10px] items-center left-0 bottom-0 pb-[32px] pt-[20px] px-[16px] shadow-[0px_-2px_10px_0px_rgba(221,221,221,0.2)] w-[375px]">
       {/* Upload Options - Shown when expanded */}
       {isExpanded && (
-        <div className="w-full bg-[#fafafa] rounded-[12px] py-[20px] px-[16px] mb-[10px]">
+        <div
+          className="w-full rounded-[16px] py-[20px] px-[16px] mb-[4px]"
+          style={{ background: "#f5f5f5" }}
+        >
           <div className="flex items-center justify-around gap-[16px]">
-            <UploadOption icon={<CameraIcon />} label="사진 촬영" />
-            <UploadOption icon={<ImageIcon />} label="이미지" />
-            <UploadOption icon={<FileIcon />} label="파일" />
+            <UploadOption
+              icon={<CameraIcon />}
+              label="사진 촬영"
+              highlighted={highlightedOption === "camera"}
+            />
+            <UploadOption
+              icon={<ImageIcon />}
+              label="이미지"
+              highlighted={highlightedOption === "image"}
+            />
+            <UploadOption
+              icon={<FileIcon />}
+              label="파일"
+              highlighted={highlightedOption === "file"}
+            />
           </div>
         </div>
       )}
@@ -150,6 +208,21 @@ export function BottomInput({ isExpanded, onToggleExpanded, inputValue = "", onI
         <div className="bg-[#f5f5f5] flex-[1_0_0] min-h-px min-w-px relative rounded-[100px]">
           <div className="flex flex-row items-center size-full">
             <div className="content-stretch flex items-center justify-between pl-[12px] pr-[10px] py-[10px] relative w-full">
+              {/* Pending image thumbnail */}
+              {pendingImageType && (
+                <div className="shrink-0 mr-[8px]">
+                  <img
+                    src={IMAGE_SRCS[pendingImageType]}
+                    alt=""
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 4,
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
+              )}
               <input
                 type="text"
                 value={inputValue}

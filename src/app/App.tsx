@@ -7,103 +7,220 @@ import { ChatDemo, ScenarioType } from "./components/ChatDemo";
 import { PhoneMockup } from "./components/PhoneMockup";
 import { useIsMobile } from "./hooks/useIsMobile";
 
+const P: React.CSSProperties = { fontFamily: "'Pretendard', sans-serif" };
+
+const FLOW_BUTTONS = [
+  { id: "apple" as ScenarioType, emoji: "🍎", label: "사과 진단" },
+  { id: "strawberry" as ScenarioType, emoji: "🍓", label: "딸기 진단" },
+  { id: "subsidy" as ScenarioType, emoji: "💰", label: "보조금" },
+  { id: "translation" as ScenarioType, emoji: "🌐", label: "통번역" },
+  { id: "farming" as ScenarioType, emoji: "📋", label: "영농일지" },
+  { id: "faq" as ScenarioType, emoji: "❓", label: "자주질문" },
+];
+
+const SCENARIO_HOME_TEXT: Record<ScenarioType, string> = {
+  apple: "사과 표면에 갈색 반점이 생기는데 무슨 병인가요?",
+  strawberry: "최근에 비가 내린 후로 상태가 이상해졌어.",
+  subsidy: "받을 수 있는 보조금 확인하기",
+  translation: "내일 오전 9시부터 비강자 심기 베트남어로",
+  farming: "오늘 딸기밭에 물 주고, 어제 산 비료 5킬로 사용했어.",
+  faq: "자주 묻는 질문 알려줘",
+};
+
+function ScenarioButtons({
+  active,
+  onClick,
+}: {
+  active: ScenarioType | null;
+  onClick: (id: ScenarioType) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-[10px]">
+      {FLOW_BUTTONS.map((s) => (
+        <button key={s.id} onClick={() => onClick(s.id)} className="flex flex-col items-center gap-[3px]">
+          <div
+            className={`w-[44px] h-[44px] rounded-full flex items-center justify-center shadow-md border transition-all duration-200 ${
+              active === s.id
+                ? "bg-[#3170e2] border-[#3170e2] scale-110"
+                : "bg-white border-[#e0e0e0] hover:border-[#3170e2] hover:scale-105"
+            }`}
+          >
+            <span className="text-[22px] leading-none">{s.emoji}</span>
+          </div>
+          <span
+            style={{ ...P, fontWeight: 400, fontSize: 9, lineHeight: 1 }}
+            className={active === s.id ? "text-[#3170e2]" : "text-[#888]"}
+          >
+            {s.label.slice(0, 4)}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const isMobile = useIsMobile();
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [initialQuestion, setInitialQuestion] = useState<string>("");
-  const [scenario, setScenario] = useState<ScenarioType>("disease-apple");
+  const [activeScenario, setActiveScenario] = useState<ScenarioType | null>(null);
+  const [typingText, setTypingText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
 
-  function detectScenario(q: string): ScenarioType {
-    const lower = q.toLowerCase();
-    if (lower.includes("딸기")) return "disease-strawberry";
-    if (lower.includes("병해충") || lower.includes("진단")) return "disease-apple";
-    if (lower.includes("자주")) return "faq";
-    if (lower.includes("일지") || lower.includes("일정")) return "farming";
-    return "disease-apple";
+  function handleScenarioSelect(id: ScenarioType) {
+    // 채팅 중이면 홈으로 돌아감
+    if (showChat) setShowChat(false);
+    setIsTyping(true);
+    setTypingText("");
+
+    const targetText = SCENARIO_HOME_TEXT[id];
+    let i = 0;
+    const charDelay = Math.min(targetText.length * 35, 1000) / targetText.length;
+
+    const interval = setInterval(() => {
+      i++;
+      setTypingText(targetText.slice(0, i));
+      if (i >= targetText.length) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setTypingText("");
+          setIsTyping(false);
+          setActiveScenario(id);
+          setShowChat(true);
+        }, 500);
+      }
+    }, charDelay);
   }
 
+  const handleBack = () => {
+    setShowChat(false);
+  };
+
   const handleQuestionClick = (question: string) => {
-    setInitialQuestion(question);
-    setScenario(detectScenario(question));
-    setShowChat(true);
+    // Simple detection for home screen question clicks
+    const lower = question.toLowerCase();
+    let id: ScenarioType = "apple";
+    if (lower.includes("딸기")) id = "strawberry";
+    else if (lower.includes("보조금")) id = "subsidy";
+    else if (lower.includes("일지") || lower.includes("일정")) id = "farming";
+    else if (lower.includes("자주")) id = "faq";
+    handleScenarioSelect(id);
   };
 
   const handleChipClick = (chipLabel: string) => {
-    if (chipLabel.includes("병해충")) {
-      setScenario("disease-apple");
-    } else if (chipLabel.includes("캘린더") || chipLabel.includes("일지")) {
-      setScenario("farming");
-    } else {
-      setScenario("disease-apple");
-    }
-    setInitialQuestion(chipLabel);
-    setShowChat(true);
+    let id: ScenarioType = "apple";
+    if (chipLabel.includes("보조금")) id = "subsidy";
+    else if (chipLabel.includes("캘린더") || chipLabel.includes("일지")) id = "farming";
+    handleScenarioSelect(id);
   };
 
-  const handleInputSend = (value: string) => {
-    if (!value.trim()) return;
-    setInitialQuestion(value);
-    setScenario(detectScenario(value));
-    setShowChat(true);
-  };
-
-  const handleBackToHome = () => {
-    setShowChat(false);
-    setInitialQuestion("");
-  };
-
-  if (showChat) {
-    return (
-      <ChatDemo
-        initialQuestion={initialQuestion}
-        scenario={scenario}
-        onBack={handleBackToHome}
-      />
-    );
-  }
-
-  const homeContent = (
-    <div className="bg-white relative w-[375px] min-h-[812px] overflow-hidden" style={{ paddingTop: !isMobile ? 46 : 0 }}>
+  // ── Home view ────────────────────────────────────────────────────────────────
+  const homeView = (
+    <div
+      className="bg-white relative w-[375px] overflow-hidden"
+      style={{ height: 812, paddingTop: 46 }}
+    >
       <Header />
       <HeroSection onChipClick={handleChipClick} />
       <SuggestedQuestions onQuestionClick={handleQuestionClick} />
       <HomeBottomInput
         isExpanded={isInputExpanded}
         onToggleExpanded={() => setIsInputExpanded(!isInputExpanded)}
-        onSend={handleInputSend}
+        onSend={(value) => {
+          const lower = value.toLowerCase();
+          let id: ScenarioType = "apple";
+          if (lower.includes("딸기")) id = "strawberry";
+          else if (lower.includes("보조금")) id = "subsidy";
+          else if (lower.includes("일지")) id = "farming";
+          else if (lower.includes("자주")) id = "faq";
+          handleScenarioSelect(id);
+        }}
+        typingText={typingText}
+        isTyping={isTyping}
       />
     </div>
   );
 
-  if (isMobile) return homeContent;
+  // ── Chat view ────────────────────────────────────────────────────────────────
+  const chatView = (
+    <ChatDemo
+      key={activeScenario}
+      scenario={activeScenario}
+      onBack={handleBack}
+    />
+  );
 
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    if (showChat) {
+      return <div style={{ width: "100%" }}>{chatView}</div>;
+    }
+    return <div style={{ width: 375 }}>{homeView}</div>;
+  }
+
+  // ── Desktop layout ───────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#f2f2f7" }}>
-      <PhoneMockup>{homeContent}</PhoneMockup>
+    <div
+      className="min-h-screen flex items-center justify-center gap-[32px]"
+      style={{ background: "#f2f2f7" }}
+    >
+      {/* Left hint */}
+      <div className="flex flex-col items-center gap-[12px] w-[120px]">
+        <div className="text-[28px]">👉</div>
+        <p
+          style={{
+            ...P,
+            fontWeight: 500,
+            fontSize: 13,
+            color: "#888",
+            lineHeight: 1.6,
+            textAlign: "center",
+          }}
+        >
+          화면 옆 버튼을 눌러<br />시나리오를<br />선택해 보세요
+        </p>
+      </div>
+
+      {/* Center phone mockup */}
+      <PhoneMockup>
+        {showChat ? chatView : homeView}
+      </PhoneMockup>
+
+      {/* Right scenario buttons */}
+      <ScenarioButtons active={activeScenario} onClick={handleScenarioSelect} />
     </div>
   );
 }
 
-// Wrapper to add onSend support to home screen BottomInput
+// ── HomeBottomInput helper ───────────────────────────────────────────────────
 function HomeBottomInput({
   isExpanded,
   onToggleExpanded,
   onSend,
+  typingText,
+  isTyping,
 }: {
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onSend: (value: string) => void;
+  typingText?: string;
+  isTyping?: boolean;
 }) {
   const [value, setValue] = useState("");
+
+  const displayValue = isTyping ? typingText ?? "" : value;
+
   return (
     <BottomInput
       isExpanded={isExpanded}
       onToggleExpanded={onToggleExpanded}
-      inputValue={value}
-      onInputChange={setValue}
+      inputValue={displayValue}
+      onInputChange={isTyping ? undefined : setValue}
       onSend={() => {
-        if (value.trim()) { onSend(value.trim()); setValue(""); }
+        if (!isTyping && value.trim()) {
+          onSend(value.trim());
+          setValue("");
+        }
       }}
     />
   );
